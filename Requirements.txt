@@ -1,0 +1,13 @@
+# --- Backend / API ---
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+sqlalchemy==2.0.36
+pydantic==2.9.2
+
+# --- Frontend móvil (Flet) ---
+flet==0.25.1
+
+# --- Seguridad / Auth ---
+passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.3.0
+
