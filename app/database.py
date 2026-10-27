@@ -36,6 +36,6 @@ def init_db():
     Importar los modelos antes de llamar a esta función.
     """
     # Importamos aquí para que SQLAlchemy registre las tablas
-    from app import user  # noqa: F401
+    from app.services import user  # noqa: F401
     Base.metadata.create_all(bind=engine)
 
