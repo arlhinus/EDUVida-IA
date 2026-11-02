@@ -26,9 +26,9 @@ class Usuario(Base):
     apellidos = Column(String(100), nullable=False)
     rut = Column(String(12), unique=True, nullable=False, index=True)
     cumpleanos = Column(Date, nullable=True)
-    curso = Column(String(50), nullable=True)             # ej: '4°B'
+    curso = Column(String(50), nullable=True)      # ej: '4ºB'
     necesidades_medicas = Column(Text, nullable=True)
-
+    password_hash = Column(String(255), nullable=False)
     # Relaciones
     estados_animo = relationship(
         "EstadoAnimo",

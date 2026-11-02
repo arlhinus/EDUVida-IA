@@ -33,9 +33,10 @@ def get_db():
 def init_db():
     """
     Crea todas las tablas registradas en los modelos.
-    Importar los modelos antes de llamar a esta función.
     """
-    # Importamos aquí para que SQLAlchemy registre las tablas
-    from app.services import user  # noqa: F401
+    # Importamos los modelos AQUÍ ADENTRO para evitar importaciones circulares.
+    # Al importarlos, SQLAlchemy se entera de que las tablas existen y las crea.
+    from app.models.user import Usuario, EstadoAnimo
+    
     Base.metadata.create_all(bind=engine)
 
