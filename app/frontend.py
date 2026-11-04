@@ -1,5 +1,6 @@
 """
 Interfaz gráfica de Edu-vida con vista para Estudiantes y Profesores.
+Incluye detección visual de alertas en el panel del profesor.
 """
 import flet as ft
 import requests
@@ -67,7 +68,6 @@ def main(page: ft.Page):
                 rol_guardado = data["usuario"]["rol"]
                 codigo_guardado = data["usuario"]["codigo"]
                 
-                # Magia: Dependiendo del rol, mostramos una pantalla u otra
                 if rol_guardado == "estudiante":
                     mostrar_pantalla_animo()
                 else:
@@ -77,7 +77,7 @@ def main(page: ft.Page):
                 lbl_mensaje.color = ft.Colors.RED
                 page.update()
         except Exception as ex:
-            lbl_mensaje.value = f"Error de conexión. ¿Está encendido Uvicorn?"
+            lbl_mensaje.value = "Error de conexión. ¿Está encendido Uvicorn?"
             page.update()
 
     # ==========================================
@@ -121,8 +121,11 @@ def main(page: ft.Page):
                     ft.Divider(),
                 ]
                 
-                # Lógica de alerta: Buscar si hay 3 o más registros con nivel <= 2
-                alertas_bajas = [h for h in historial if h["nivel_animo"] <= 2]
+                # Protección: Verificar que el historial exista antes de recorrerlo
+                alertas_bajas = []
+                if historial:
+                    alertas_bajas = [h for h in historial if h.get("nivel_animo") is not None and h["nivel_animo"] <= 2]
+                
                 if len(alertas_bajas) >= 3:
                     controles.append(
                         ft.Container(
@@ -138,12 +141,13 @@ def main(page: ft.Page):
                     controles.append(ft.Text("El estudiante no tiene registros aún."))
                 else:
                     for h in historial:
-                        color_nivel = ft.Colors.GREEN if h["nivel_animo"] >= 4 else (ft.Colors.ORANGE if h["nivel_animo"] == 3 else ft.Colors.RED)
+                        nivel = h.get("nivel_animo", 0)
+                        color_nivel = ft.Colors.GREEN if nivel >= 4 else (ft.Colors.ORANGE if nivel == 3 else ft.Colors.RED)
                         controles.append(
                             ft.ListTile(
                                 leading=ft.Icon(ft.Icons.MOOD, color=color_nivel),
-                                title=ft.Text(f"Nivel: {h['nivel_animo']}/5"),
-                                subtitle=ft.Text(f"{h['comentario'] or 'Sin comentario'}\nFecha: {h['fecha'][:10]}"),
+                                title=ft.Text(f"Nivel: {nivel}/5"),
+                                subtitle=ft.Text(f"{h.get('comentario') or 'Sin comentario'}\nFecha: {h.get('fecha', '')[:10]}"),
                             )
                         )
 
@@ -151,7 +155,7 @@ def main(page: ft.Page):
                 page.add(ft.Column(controles, scroll=ft.ScrollMode.AUTO, expand=True))
                 page.update()
         except Exception as ex:
-            print(ex)
+            print(f"Error en historial: {ex}")
 
     def cargar_lista_estudiantes():
         headers = {"Authorization": f"Bearer {token_guardado}"}
@@ -165,14 +169,30 @@ def main(page: ft.Page):
                     lista_estudiantes.controls.append(ft.Text("No hay estudiantes registrados."))
                 else:
                     for est in estudiantes:
+                        res_hist = requests.get(f"{API_URL}/animo/historial/{est['codigo']}", headers=headers)
+                        tiene_alerta = False
+                        
+                        if res_hist.status_code == 200:
+                            historial = res_hist.json()
+                            # Protección: Solo evaluar si hay historial
+                            if historial:
+                                alertas_bajas = [h for h in historial if h.get("nivel_animo") is not None and h["nivel_animo"] <= 2]
+                                if len(alertas_bajas) >= 3:
+                                    tiene_alerta = True
+                                
+                        texto_boton = f"⚠️ {est['nombres']} {est['apellidos']} (¡Alerta!)" if tiene_alerta else f"{est['nombres']} {est['apellidos']} ({est['codigo']})"
+                        color_boton = ft.Colors.RED if tiene_alerta else ft.Colors.BLUE
+                        
                         btn = ft.Button(
-                            f"Ver historial de {est['nombres']} {est['apellidos']} ({est['codigo']})",
-                            on_click=lambda e, c=est['codigo'], n=f"{est['nombres']} {est['apellidos']}": ver_historial_estudiante(e, c, n)
+                            texto_boton,
+                            on_click=lambda e, c=est['codigo'], n=f"{est['nombres']} {est['apellidos']}": ver_historial_estudiante(e, c, n),
+                            bgcolor=color_boton,
+                            color=ft.Colors.WHITE
                         )
                         lista_estudiantes.controls.append(btn)
                 page.update()
         except Exception as ex:
-            print(ex)
+            print(f"Error al cargar estudiantes: {ex}")
 
     # ==========================================
     #  VISTAS (PANTALLAS)
@@ -180,6 +200,7 @@ def main(page: ft.Page):
     def mostrar_pantalla_animo():
         page.clean()
         page.add(
+            ft.Text(f"¡Hola, {codigo_guardado}!", size=16, weight=ft.FontWeight.BOLD),
             ft.Text("¿Cómo te sientes hoy?", theme_style=ft.TextThemeStyle.HEADLINE_SMALL, weight=ft.FontWeight.BOLD),
             slider_animo,
             txt_comentario,
