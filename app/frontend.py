@@ -1,8 +1,8 @@
 """
-Interfaz gráfica de Edu-vida con vista para Estudiantes y Profesores.
-Incluye detección visual de alertas en el panel del profesor.
+Interfaz gráfica de Edu-vida con vista para Estudiantes, Profesores y Gráfico.
 """
 import flet as ft
+import flet_charts as fch  # Módulo necesario para los gráficos en Flet 1.0
 import requests
 
 API_URL = "http://127.0.0.1:8000"
@@ -15,24 +15,21 @@ def main(page: ft.Page):
     page.window_width = 450
     page.window_height = 750
 
-    # Variables de estado de la sesión
+    # Variables de estado
     token_guardado = None
     rol_guardado = None
     codigo_guardado = None
 
     # ==========================================
-    #  COMPONENTES DE LOGIN
+    #  COMPONENTES DE LOGIN Y REGISTRO
     # ==========================================
     txt_codigo = ft.TextField(label="Código de estudiante", width=300)
     txt_password = ft.TextField(label="Contraseña", password=True, width=300)
     lbl_mensaje = ft.Text("", color=ft.Colors.RED)
 
-    # ==========================================
-    #  COMPONENTES DE REGISTRO
-    # ==========================================
     reg_nombres = ft.TextField(label="Nombres", width=300)
     reg_apellidos = ft.TextField(label="Apellidos", width=300)
-    reg_rut = ft.TextField(label="RUT (ej: 12345678-9)", width=300)
+    reg_rut = ft.TextField(label="RUT", width=300)
     reg_codigo = ft.TextField(label="Código de estudiante", width=300)
     reg_curso = ft.TextField(label="Curso", width=300)
     reg_password = ft.TextField(label="Contraseña", password=True, width=300)
@@ -43,7 +40,8 @@ def main(page: ft.Page):
     # ==========================================
     txt_comentario = ft.TextField(label="¿Por qué te sientes así?", width=300, multiline=True)
     lbl_alerta = ft.Text("", weight=ft.FontWeight.BOLD, visible=False)
-    slider_animo = ft.Slider(min=1, max=5, divisions=4, label="{value}", width=300)
+    # Valor por defecto 3 para evitar errores
+    slider_animo = ft.Slider(min=1, max=5, divisions=4, label="{value}", value=3, width=300)
 
     # ==========================================
     #  COMPONENTES DE PROFESOR
@@ -81,13 +79,14 @@ def main(page: ft.Page):
             page.update()
 
     # ==========================================
-    #  LÓGICA ESTUDIANTE
+    #  LÓGICA ESTUDIANTE (ÁNIMO Y GRÁFICO)
     # ==========================================
     def registrar_animo(e):
         if not token_guardado: return
-
         headers = {"Authorization": f"Bearer {token_guardado}"}
-        data = {"nivel_animo": int(slider_animo.value), "comentario": txt_comentario.value}
+        
+        nivel_seleccionado = slider_animo.value if slider_animo.value is not None else 3
+        data = {"nivel_animo": int(nivel_seleccionado), "comentario": txt_comentario.value}
         
         try:
             response = requests.post(f"{API_URL}/animo/registrar", json=data, headers=headers)
@@ -103,6 +102,73 @@ def main(page: ft.Page):
                 page.update()
         except Exception as ex:
             print(ex)
+
+    def mostrar_grafico(e):
+        if not token_guardado: return
+        headers = {"Authorization": f"Bearer {token_guardado}"}
+        
+        try:
+            response = requests.get(f"{API_URL}/animo/historial/{codigo_guardado}", headers=headers)
+            if response.status_code == 200:
+                historial = response.json()
+                page.clean()
+                
+                contenedor_grafico = ft.Container(height=300, width=350)
+                
+                controles = [
+                    ft.Text("Mi Progreso Emocional", theme_style=ft.TextThemeStyle.HEADLINE_SMALL, weight=ft.FontWeight.BOLD),
+                    ft.Text("Tus últimos registros:", size=14),
+                    ft.Divider(),
+                ]
+
+                if not historial:
+                    controles.append(ft.Text("Aún no tienes registros de ánimo."))
+                else:
+                    ultimos = historial[:7]
+                    ultimos.reverse()
+                    
+                    puntos = []
+                    for i, h in enumerate(ultimos):
+                        nivel = h.get("nivel_animo", 3)
+                        y_val = nivel - 1  # Escala de 0 a 4
+                        puntos.append(fch.LineChartDataPoint(i, y_val))
+
+                    if len(puntos) == 1:
+                        puntos.append(fch.LineChartDataPoint(1, puntos[0].y))
+                    elif len(puntos) == 0:
+                        puntos.append(fch.LineChartDataPoint(0, 0))
+                        puntos.append(fch.LineChartDataPoint(1, 1))
+
+                    # Gráfico simplificado al máximo
+                    grafico = fch.LineChart(
+                        data_series=[
+                            fch.LineChartData(
+                                points=puntos,
+                                color=ft.Colors.BLUE
+                            )
+                        ],
+                        min_y=0,
+                        max_y=4,
+                        min_x=0,
+                        max_x=max(1, len(puntos) - 1),
+                        left_axis=fch.ChartAxis(label_size=30),   # 👈 labels_size -> label_size
+                        bottom_axis=fch.ChartAxis(label_size=30), # 👈 labels_size -> label_size
+                        expand=True,
+                    )
+                    
+                    contenedor_grafico.content = grafico
+                    controles.append(contenedor_grafico)
+                    controles.append(ft.Text("Eje Y: 0 = Muy mal, 4 = Muy bien", size=10, color=ft.Colors.GREY))
+
+                controles.append(ft.Button("Volver", on_click=lambda _: mostrar_pantalla_animo()))
+                page.add(ft.Column(controles, horizontal_alignment=ft.CrossAxisAlignment.CENTER))
+                page.update()
+        except Exception as ex:
+            print(f"Error al generar gráfico: {ex}")
+            page.clean()
+            page.add(ft.Text(f"Error al generar gráfico: {ex}", color=ft.Colors.RED))
+            page.add(ft.Button("Volver", on_click=lambda _: mostrar_pantalla_animo()))
+            page.update()
 
     # ==========================================
     #  LÓGICA PROFESOR
@@ -121,7 +187,6 @@ def main(page: ft.Page):
                     ft.Divider(),
                 ]
                 
-                # Protección: Verificar que el historial exista antes de recorrerlo
                 alertas_bajas = []
                 if historial:
                     alertas_bajas = [h for h in historial if h.get("nivel_animo") is not None and h["nivel_animo"] <= 2]
@@ -171,10 +236,8 @@ def main(page: ft.Page):
                     for est in estudiantes:
                         res_hist = requests.get(f"{API_URL}/animo/historial/{est['codigo']}", headers=headers)
                         tiene_alerta = False
-                        
                         if res_hist.status_code == 200:
                             historial = res_hist.json()
-                            # Protección: Solo evaluar si hay historial
                             if historial:
                                 alertas_bajas = [h for h in historial if h.get("nivel_animo") is not None and h["nivel_animo"] <= 2]
                                 if len(alertas_bajas) >= 3:
@@ -205,6 +268,7 @@ def main(page: ft.Page):
             slider_animo,
             txt_comentario,
             ft.Button("Registrar Ánimo", on_click=registrar_animo, width=300),
+            ft.Button("Ver mi progreso 📈", on_click=mostrar_grafico, width=300, bgcolor=ft.Colors.BLUE_200),
             lbl_alerta,
             ft.TextButton("Cerrar Sesión", on_click=lambda _: cerrar_sesion())
         )
