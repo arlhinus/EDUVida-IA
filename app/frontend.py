@@ -139,7 +139,6 @@ def main(page: ft.Page):
                         puntos.append(fch.LineChartDataPoint(0, 0))
                         puntos.append(fch.LineChartDataPoint(1, 1))
 
-                    # Gráfico simplificado al máximo
                     grafico = fch.LineChart(
                         data_series=[
                             fch.LineChartData(
@@ -151,8 +150,8 @@ def main(page: ft.Page):
                         max_y=4,
                         min_x=0,
                         max_x=max(1, len(puntos) - 1),
-                        left_axis=fch.ChartAxis(label_size=30),   # 👈 labels_size -> label_size
-                        bottom_axis=fch.ChartAxis(label_size=30), # 👈 labels_size -> label_size
+                        left_axis=fch.ChartAxis(label_size=30),
+                        bottom_axis=fch.ChartAxis(label_size=30),
                         expand=True,
                     )
                     
@@ -191,6 +190,7 @@ def main(page: ft.Page):
                 if historial:
                     alertas_bajas = [h for h in historial if h.get("nivel_animo") is not None and h["nivel_animo"] <= 2]
                 
+                # --- ALERTA ROJA ---
                 if len(alertas_bajas) >= 3:
                     controles.append(
                         ft.Container(
@@ -200,6 +200,45 @@ def main(page: ft.Page):
                             border_radius=5
                         )
                     )
+                    controles.append(ft.Divider())
+
+                # --- GRÁFICO PARA EL PROFESOR ---
+                if historial:
+                    ultimos = historial[:7]
+                    ultimos.reverse()
+                    
+                    puntos = []
+                    for i, h in enumerate(ultimos):
+                        nivel = h.get("nivel_animo", 3)
+                        y_val = nivel - 1
+                        puntos.append(fch.LineChartDataPoint(i, y_val))
+
+                    if len(puntos) == 1:
+                        puntos.append(fch.LineChartDataPoint(1, puntos[0].y))
+                    elif len(puntos) == 0:
+                        puntos.append(fch.LineChartDataPoint(0, 0))
+                        puntos.append(fch.LineChartDataPoint(1, 1))
+
+                    grafico = fch.LineChart(
+                        data_series=[
+                            fch.LineChartData(
+                                points=puntos,
+                                color=ft.Colors.BLUE
+                            )
+                        ],
+                        min_y=0,
+                        max_y=4,
+                        min_x=0,
+                        max_x=max(1, len(puntos) - 1),
+                        left_axis=fch.ChartAxis(label_size=30),
+                        bottom_axis=fch.ChartAxis(label_size=30),
+                        expand=True,
+                    )
+                    
+                    contenedor_grafico = ft.Container(height=200, width=350, content=grafico)
+                    controles.append(ft.Text("Progreso reciente:", weight=ft.FontWeight.BOLD))
+                    controles.append(contenedor_grafico)
+                    controles.append(ft.Text("Eje Y: 0 = Muy mal, 4 = Muy bien", size=10, color=ft.Colors.GREY))
                     controles.append(ft.Divider())
 
                 if not historial:
