@@ -9,7 +9,9 @@ from app.database import init_db
 from app.api.users import router as users_router
 from app.api.moods import router as moods_router
 
-# Creamos la instancia de FastAPI
+# Creamos la instancia de FastAPI.
+# ⚠️ IMPORTANTE: La variable DEBE llamarse exactamente "app" 
+# para que Render (uvicorn app.main:app) la encuentre.
 app = FastAPI(
     title="Edu-vida API",
     description="API para gestionar el bienestar emocional de estudiantes",
