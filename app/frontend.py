@@ -2,7 +2,7 @@
 Interfaz gráfica de Edu-vida con vista para Estudiantes, Profesores y Gráfico.
 """
 import flet as ft
-import flet_charts as fch  # Módulo necesario para los gráficos en Flet 1.0
+import flet_charts as fch
 import requests
 
 API_URL = "http://127.0.0.1:8000"
@@ -15,7 +15,6 @@ def main(page: ft.Page):
     page.window_width = 450
     page.window_height = 750
 
-    # Variables de estado
     token_guardado = None
     rol_guardado = None
     codigo_guardado = None
@@ -40,7 +39,6 @@ def main(page: ft.Page):
     # ==========================================
     txt_comentario = ft.TextField(label="¿Por qué te sientes así?", width=300, multiline=True)
     lbl_alerta = ft.Text("", weight=ft.FontWeight.BOLD, visible=False)
-    # Valor por defecto 3 para evitar errores
     slider_animo = ft.Slider(min=1, max=5, divisions=4, label="{value}", value=3, width=300)
 
     # ==========================================
@@ -79,7 +77,7 @@ def main(page: ft.Page):
             page.update()
 
     # ==========================================
-    #  LÓGICA ESTUDIANTE (ÁNIMO Y GRÁFICO)
+    #  LÓGICA ESTUDIANTE
     # ==========================================
     def registrar_animo(e):
         if not token_guardado: return
@@ -114,7 +112,6 @@ def main(page: ft.Page):
                 page.clean()
                 
                 contenedor_grafico = ft.Container(height=300, width=350)
-                
                 controles = [
                     ft.Text("Mi Progreso Emocional", theme_style=ft.TextThemeStyle.HEADLINE_SMALL, weight=ft.FontWeight.BOLD),
                     ft.Text("Tus últimos registros:", size=14),
@@ -130,7 +127,7 @@ def main(page: ft.Page):
                     puntos = []
                     for i, h in enumerate(ultimos):
                         nivel = h.get("nivel_animo", 3)
-                        y_val = nivel - 1  # Escala de 0 a 4
+                        y_val = nivel - 1
                         puntos.append(fch.LineChartDataPoint(i, y_val))
 
                     if len(puntos) == 1:
@@ -139,35 +136,40 @@ def main(page: ft.Page):
                         puntos.append(fch.LineChartDataPoint(0, 0))
                         puntos.append(fch.LineChartDataPoint(1, 1))
 
+                    labels_y = [
+                        fch.ChartAxisLabel(value=0, label=ft.Text("1", size=12)),
+                        fch.ChartAxisLabel(value=1, label=ft.Text("2", size=12)),
+                        fch.ChartAxisLabel(value=2, label=ft.Text("3", size=12)),
+                        fch.ChartAxisLabel(value=3, label=ft.Text("4", size=12)),
+                        fch.ChartAxisLabel(value=4, label=ft.Text("5", size=12)),
+                    ]
+                    
+                    # 👇 CAMBIO: Etiquetas del Eje X con las fechas reales 👇
+                    labels_x = [
+                        fch.ChartAxisLabel(
+                            value=i, 
+                            label=ft.Text(h.get("fecha", "")[8:10] + "/" + h.get("fecha", "")[5:7], size=10)
+                        )
+                        for i, h in enumerate(ultimos)
+                    ]
+
                     grafico = fch.LineChart(
-                        data_series=[
-                            fch.LineChartData(
-                                points=puntos,
-                                color=ft.Colors.BLUE
-                            )
-                        ],
-                        min_y=0,
-                        max_y=4,
-                        min_x=0,
-                        max_x=max(1, len(puntos) - 1),
-                        left_axis=fch.ChartAxis(label_size=30),
-                        bottom_axis=fch.ChartAxis(label_size=30),
+                        data_series=[fch.LineChartData(points=puntos, color=ft.Colors.BLUE)],
+                        min_y=0, max_y=4, min_x=0, max_x=max(1, len(puntos) - 1),
+                        left_axis=fch.ChartAxis(label_size=30, labels=labels_y),
+                        bottom_axis=fch.ChartAxis(label_size=30, labels=labels_x),
                         expand=True,
                     )
                     
                     contenedor_grafico.content = grafico
                     controles.append(contenedor_grafico)
-                    controles.append(ft.Text("Eje Y: 0 = Muy mal, 4 = Muy bien", size=10, color=ft.Colors.GREY))
+                    controles.append(ft.Text("Eje X: Fechas de registro | Eje Y: Nivel de ánimo (1 a 5)", size=10, color=ft.Colors.GREY))
 
                 controles.append(ft.Button("Volver", on_click=lambda _: mostrar_pantalla_animo()))
                 page.add(ft.Column(controles, horizontal_alignment=ft.CrossAxisAlignment.CENTER))
                 page.update()
         except Exception as ex:
             print(f"Error al generar gráfico: {ex}")
-            page.clean()
-            page.add(ft.Text(f"Error al generar gráfico: {ex}", color=ft.Colors.RED))
-            page.add(ft.Button("Volver", on_click=lambda _: mostrar_pantalla_animo()))
-            page.update()
 
     # ==========================================
     #  LÓGICA PROFESOR
@@ -186,23 +188,17 @@ def main(page: ft.Page):
                     ft.Divider(),
                 ]
                 
-                alertas_bajas = []
-                if historial:
-                    alertas_bajas = [h for h in historial if h.get("nivel_animo") is not None and h["nivel_animo"] <= 2]
+                alertas_bajas = [h for h in historial if h.get("nivel_animo") is not None and h["nivel_animo"] <= 2] if historial else []
                 
-                # --- ALERTA ROJA ---
                 if len(alertas_bajas) >= 3:
                     controles.append(
                         ft.Container(
                             content=ft.Text("⚠️ ALERTA: Varios registros de ánimo bajo recientes.", color=ft.Colors.WHITE),
-                            bgcolor=ft.Colors.RED,
-                            padding=10,
-                            border_radius=5
+                            bgcolor=ft.Colors.RED, padding=10, border_radius=5
                         )
                     )
                     controles.append(ft.Divider())
 
-                # --- GRÁFICO PARA EL PROFESOR ---
                 if historial:
                     ultimos = historial[:7]
                     ultimos.reverse()
@@ -210,35 +206,40 @@ def main(page: ft.Page):
                     puntos = []
                     for i, h in enumerate(ultimos):
                         nivel = h.get("nivel_animo", 3)
-                        y_val = nivel - 1
-                        puntos.append(fch.LineChartDataPoint(i, y_val))
+                        puntos.append(fch.LineChartDataPoint(i, nivel - 1))
 
                     if len(puntos) == 1:
                         puntos.append(fch.LineChartDataPoint(1, puntos[0].y))
-                    elif len(puntos) == 0:
-                        puntos.append(fch.LineChartDataPoint(0, 0))
-                        puntos.append(fch.LineChartDataPoint(1, 1))
+
+                    labels_y = [
+                        fch.ChartAxisLabel(value=0, label=ft.Text("1", size=12)),
+                        fch.ChartAxisLabel(value=1, label=ft.Text("2", size=12)),
+                        fch.ChartAxisLabel(value=2, label=ft.Text("3", size=12)),
+                        fch.ChartAxisLabel(value=3, label=ft.Text("4", size=12)),
+                        fch.ChartAxisLabel(value=4, label=ft.Text("5", size=12)),
+                    ]
+                    
+                    # 👇 CAMBIO: Etiquetas del Eje X con las fechas reales 👇
+                    labels_x = [
+                        fch.ChartAxisLabel(
+                            value=i, 
+                            label=ft.Text(h.get("fecha", "")[8:10] + "/" + h.get("fecha", "")[5:7], size=10)
+                        )
+                        for i, h in enumerate(ultimos)
+                    ]
 
                     grafico = fch.LineChart(
-                        data_series=[
-                            fch.LineChartData(
-                                points=puntos,
-                                color=ft.Colors.BLUE
-                            )
-                        ],
-                        min_y=0,
-                        max_y=4,
-                        min_x=0,
-                        max_x=max(1, len(puntos) - 1),
-                        left_axis=fch.ChartAxis(label_size=30),
-                        bottom_axis=fch.ChartAxis(label_size=30),
+                        data_series=[fch.LineChartData(points=puntos, color=ft.Colors.BLUE)],
+                        min_y=0, max_y=4, min_x=0, max_x=max(1, len(puntos) - 1),
+                        left_axis=fch.ChartAxis(label_size=30, labels=labels_y),
+                        bottom_axis=fch.ChartAxis(label_size=30, labels=labels_x),
                         expand=True,
                     )
                     
                     contenedor_grafico = ft.Container(height=200, width=350, content=grafico)
                     controles.append(ft.Text("Progreso reciente:", weight=ft.FontWeight.BOLD))
                     controles.append(contenedor_grafico)
-                    controles.append(ft.Text("Eje Y: 0 = Muy mal, 4 = Muy bien", size=10, color=ft.Colors.GREY))
+                    controles.append(ft.Text("Eje X: Fechas de registro | Eje Y: Nivel de ánimo (1 a 5)", size=10, color=ft.Colors.GREY))
                     controles.append(ft.Divider())
 
                 if not historial:
@@ -288,8 +289,7 @@ def main(page: ft.Page):
                         btn = ft.Button(
                             texto_boton,
                             on_click=lambda e, c=est['codigo'], n=f"{est['nombres']} {est['apellidos']}": ver_historial_estudiante(e, c, n),
-                            bgcolor=color_boton,
-                            color=ft.Colors.WHITE
+                            bgcolor=color_boton, color=ft.Colors.WHITE
                         )
                         lista_estudiantes.controls.append(btn)
                 page.update()
